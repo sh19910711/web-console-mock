@@ -1,6 +1,49 @@
 {
 	"comment": "",
 	"ignore": "test",
-	"package": [],
+	"package": [
+		{
+			"checksumSHA1": "a3MwvEHFIkfvx/fRcE2eDni9Fdw=",
+			"path": "github.com/zenazn/goji",
+			"revision": "64eb34159fe53473206c2b3e70fe396a639452f2",
+			"revisionTime": "2016-05-07T20:19:45Z"
+		},
+		{
+			"checksumSHA1": "T9J7FOCeCaD5q8T2v+72WtRq2ds=",
+			"path": "github.com/zenazn/goji/bind",
+			"revision": "64eb34159fe53473206c2b3e70fe396a639452f2",
+			"revisionTime": "2016-05-07T20:19:45Z"
+		},
+		{
+			"checksumSHA1": "VlmqBl1j3cULPU18lMBXNf+IHY8=",
+			"path": "github.com/zenazn/goji/graceful",
+			"revision": "64eb34159fe53473206c2b3e70fe396a639452f2",
+			"revisionTime": "2016-05-07T20:19:45Z"
+		},
+		{
+			"checksumSHA1": "caN0mgXEzfd0w9rhUsppkUUUCns=",
+			"path": "github.com/zenazn/goji/graceful/listener",
+			"revision": "64eb34159fe53473206c2b3e70fe396a639452f2",
+			"revisionTime": "2016-05-07T20:19:45Z"
+		},
+		{
+			"checksumSHA1": "2D1oFW10TM4Rhvza5qwyZ1F39ZI=",
+			"path": "github.com/zenazn/goji/web",
+			"revision": "64eb34159fe53473206c2b3e70fe396a639452f2",
+			"revisionTime": "2016-05-07T20:19:45Z"
+		},
+		{
+			"checksumSHA1": "6rHgrhLBfPQ8+CZwH0tnVV8843k=",
+			"path": "github.com/zenazn/goji/web/middleware",
+			"revision": "64eb34159fe53473206c2b3e70fe396a639452f2",
+			"revisionTime": "2016-05-07T20:19:45Z"
+		},
+		{
+			"checksumSHA1": "g9hmnkrmD9/3bVFYssjA1mu+r2o=",
+			"path": "github.com/zenazn/goji/web/mutil",
+			"revision": "64eb34159fe53473206c2b3e70fe396a639452f2",
+			"revisionTime": "2016-05-07T20:19:45Z"
+		}
+	],
 	"rootPath": "web-console-mock"
 }
