@@ -448,7 +448,7 @@ REPLConsole.prototype.onTabKey = function() {
     self.startCompleting();
     self.commandHandle(cmd, function(ok, obj) {
       if (ok) {
-        self._autoComplete = new AutoComplete(obj['output']);
+        self._autoComplete = new AutoComplete(JSON.parse(obj['output']));
         self.inner.appendChild(self._autoComplete.render());
         self.scrollToBottom();
       }
