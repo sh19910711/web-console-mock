@@ -18,13 +18,25 @@ func index(c web.C, w http.ResponseWriter, r *http.Request) {
   w.Write(buf)
 }
 
-type FakeResponse struct {
+type CompleteResponse struct {
+  Output []string `json:"output"`
+}
+
+type OutputResponse struct {
   Output string `json:"output"`
 }
 
 func update_session(c web.C, w http.ResponseWriter, r *http.Request) {
-  output := &FakeResponse {
-    Output: "[\"something\", \"another\", \"one_more_thing\"]",
+  var output interface {}
+  fmt.Println(r.FormValue("rawdata"))
+  if r.FormValue("rawdata") == "true" {
+    output = &CompleteResponse {
+      Output: []string{"something", "another", "one_more_thing"},
+    }
+  } else {
+    output = &OutputResponse {
+      Output: "fake output",
+    }
   }
   buf, err := json.Marshal(output)
   if err != nil {
