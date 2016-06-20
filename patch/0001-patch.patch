@@ -1,0 +1,74 @@
+From 29f5a1c8041ed86f3ee538adf46e33b3398ca860 Mon Sep 17 00:00:00 2001
+From: Hiroyuki Sano <sh19910711@gmail.com>
+Date: Mon, 20 Jun 2016 09:15:06 +0900
+Subject: [PATCH] patch
+
+---
+ lib/web_console/tasks/extensions.rake | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/lib/web_console/tasks/extensions.rake b/lib/web_console/tasks/extensions.rake
+index 2035b84..38c07cd 100644
+--- a/lib/web_console/tasks/extensions.rake
++++ b/lib/web_console/tasks/extensions.rake
+@@ -1,18 +1,19 @@
+ namespace :ext do
+-  rootdir = Pathname('extensions')
++  rootdir = Pathname(File.expand_path(File.join(__FILE__, '../../../../')))
++  extdir = rootdir.join('extensions')
+ 
+   desc 'Build Chrome Extension'
+   task chrome: 'chrome:build'
+ 
+   namespace :chrome do
+     dist   = Pathname('dist/crx')
+-    extdir = rootdir.join(dist)
++    distdir = rootdir.join(dist)
+     manifest_json = rootdir.join('chrome/manifest.json')
+ 
+-    directory extdir
++    directory distdir
+ 
+-    task build: [ extdir, 'lib:templates' ] do
+-      cd rootdir do
++    task build: [ distdir, 'lib:templates' ] do
++      cd extdir do
+         cp_r [ 'img/', 'tmp/lib/' ], dist
+         `cd chrome && git ls-files`.split("\n").each do |src|
+           dest = dist.join(src)
+@@ -25,27 +26,27 @@ namespace :ext do
+     # Generate a .crx file.
+     task crx: [ :build, :npm ] do
+       out = "crx-web-console-#{JSON.parse(File.read(manifest_json))["version"]}.crx"
+-      cd(extdir) { sh "node \"$(npm bin)/crx\" pack ./ -p ../crx-web-console.pem -o ../#{out}" }
++      cd(distdir) { sh "node \"$(npm bin)/crx\" pack ./ -p ../crx-web-console.pem -o ../#{out}" }
+     end
+ 
+     # Generate a .zip file for Chrome Web Store.
+     task zip: [ :build ] do
+       version = JSON.parse(File.read(manifest_json))["version"]
+-      cd(extdir) { sh "zip -r ../crx-web-console-#{version}.zip ./" }
++      cd(distdir) { sh "zip -r ../crx-web-console-#{version}.zip ./" }
+     end
+ 
+     desc 'Launch a browser with the chrome extension.'
+     task run: [ :build ] do
+-      cd(rootdir) { sh "sh ./script/run_chrome.sh --load-extension=#{dist}" }
++      cd(extdir) { sh "sh ./script/run_chrome.sh --load-extension=#{dist}" }
+     end
+   end
+ 
+   task :npm do
+-    cd(rootdir) { sh "npm install --silent" }
++    cd(extdir) { sh "npm install --silent" }
+   end
+ 
+   namespace :lib do
+-    templates = Pathname('lib/web_console/templates')
++    templates = rootdir.join('lib/web_console/templates')
+     tmplib    = rootdir.join('tmp/lib/')
+     js_erb    = FileList.new(templates.join('**/*.js.erb'))
+     dirs      = js_erb.pathmap("%{^#{templates},#{tmplib}}d")
+-- 
+2.9.0
+
