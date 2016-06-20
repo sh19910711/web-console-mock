@@ -28,7 +28,6 @@ type OutputResponse struct {
 
 func update_session(c web.C, w http.ResponseWriter, r *http.Request) {
   var output interface {}
-  fmt.Println(r.FormValue("rawdata"))
   if r.FormValue("rawdata") == "true" {
     output = &CompleteResponse {
       Output: []string{"something", "another", "one_more_thing"},
