@@ -45,5 +45,9 @@
 			"revisionTime": "2016-05-07T20:19:45Z"
 		}
 	],
-	"rootPath": "web-console-mock"
+	"rootPath": "web-console-mock",
+	"heroku": {
+		"install" : [ "./..." ],
+		"goVersion": "go1.6"
+	}
 }
