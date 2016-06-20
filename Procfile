@@ -1,1 +1,1 @@
-web: web-console-mock
+web: PORT=$PORT web-console-mock
