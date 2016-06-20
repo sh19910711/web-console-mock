@@ -1,5 +1,9 @@
 language: go
 
+go:
+  - 1.4
+  - 1.6
+
 deploy:
   provider: heroku
   api_key:
