@@ -44,6 +44,61 @@ function CommandStorage() {
   }
 }
 
+function AutoComplete(list) {
+  this.list = list;
+  this.onKeyDown = this.onKeyDown.bind(this);
+  document.addEventListener('keydown', this.onKeyDown);
+}
+
+AutoComplete.prototype.render = function() {
+  function createKeyword(label) {
+    var el = document.createElement('span');
+    el.innerText = label;
+    addClass(el, 'keyword');
+    return el;
+  }
+
+  this.view = document.createElement('pre');
+  addClass(this.view, 'console-message');
+  addClass(this.view, 'auto-complete');
+  for (var key in this.list) {
+    this.view.appendChild(createKeyword(this.list[key]));
+  }
+
+  return this.view;
+};
+
+AutoComplete.prototype.getCurrentWord = function() {
+  return this.selected && this.selected.innerText;
+};
+
+AutoComplete.prototype.close = function() {
+  document.removeEventListener('keydown', this.onKeyDown);
+  this.view.parentNode.removeChild(this.view);
+};
+
+AutoComplete.prototype.onKeyDown = function(e) {
+  var self = this;
+
+  function selectItem(el) {
+    if (self.selected) removeClass(self.selected, 'selected');
+    self.selected = el;
+    addClass(el, 'selected');
+  }
+  function first() { return self.view.children[0]; }
+  function last() { return self.view.children[self.view.children.length - 1]; }
+
+  if (!this.list.length || e.keyCode !== 9) return;
+
+  if (!self.selected) {
+    selectItem(first());
+  } else if (e.shiftKey) {
+    selectItem(self.selected.previousSibling || last());
+  } else {
+    selectItem(self.selected.nextSibling || first());
+  }
+};
+
 // HTML strings for dynamic elements.
 var consoleInnerHtml = "<div class=\'resizer layer\'><\/div>\n<div class=\'console-outer layer\'>\n  <div class=\'console-actions\'>\n    <div class=\'close-button button\' title=\'close\'>x<\/div>\n  <\/div>\n  <div class=\'console-inner\'><\/div>\n<\/div>\n<input class=\'clipboard\' type=\'text\'>\n"
 ;
@@ -340,28 +395,12 @@ REPLConsole.prototype.writeError = function(output) {
   return consoleMessage;
 };
 
-REPLConsole.prototype.startCompleting = function() {
-  if (this.completing) return;
-  this.completing = true;
-  console.log('start completing');
-};
-
 REPLConsole.prototype.stopCompleting = function() {
   if (!this.completing) return;
-  console.log('stop completing');
 
-  function removeFromParent(el) {
-    el.parentNode.removeChild(el);
-  }
-
-  var result = this._autoComplete.getInput();
+  var result = this._autoComplete.getCurrentWord();
   this.completing = false;
   this._autoComplete.close();
-
-  var items = this.inner.getElementsByClassName('auto-complete');
-  for (var i = 0; i < items.length; ++i) {
-    removeFromParent(items[i]);
-  }
 
   return result;
 };
@@ -382,76 +421,20 @@ REPLConsole.prototype.onEnterKey = function() {
   this.commandHandle(input);
 };
 
-// TODO
-function AutoComplete(list) {
-  this.list = list;
-  this.onKeyDown = this.onKeyDown.bind(this);
-}
-
-AutoComplete.prototype.render = function() {
-  var self = this;
-
-  function createItem(label) {
-    var el = document.createElement('span');
-    el.innerText = label;
-    addClass(el, 'keyword');
-    return el;
-  }
-
-  var box = self.view = document.createElement('pre');
-  addClass(box, 'console-message');
-  addClass(box, 'auto-complete');
-  for (var key in self.list) {
-    box.appendChild(createItem(self.list[key]));
-  }
-
-  document.addEventListener('keydown', self.onKeyDown);
-
-  return box;
-};
-
-AutoComplete.prototype.getInput = function() {
-  var elm;
-  if (elm = findChild(this.view, 'selected')) {
-    return elm.innerText;
-  }
-};
-
-AutoComplete.prototype.close = function() {
-  document.removeEventListener('keydown', this.onKeyDown);
-};
-
-AutoComplete.prototype.onKeyDown = function(e) {
-  var box = this.view;
-  var selected = findChild(box, 'selected');
-
-  if (e.keyCode !== 9) return true;
-
-  if (!selected) {
-    addClass(box.children[0], 'selected')
-    selected = box.children[0];
-  } else {
-    var next = e.shiftKey ? selected.previousSibling : selected.nextSibling;
-    if (!next) next = e.shiftKey ? box.children[box.children.length - 1] : box.children[0];
-    addClass(next, 'selected');
-    removeClass(selected, 'selected');
-  }
-};
-
 REPLConsole.prototype.onTabKey = function() {
   var input = this._input;
   var self = this;
 
-  if (self.completing) {
-  } else {
+  if (!self.completing) {
     var cmd = "::WebConsole::WebAPI.complete('" + self.sessionId + "', '" + input + "')";
-    self.startCompleting();
+    self.completing = true;
     self.commandHandle(cmd, function(ok, obj) {
-      if (ok) {
-        self._autoComplete = new AutoComplete(obj['output']);
-        self.inner.appendChild(self._autoComplete.render());
-        self.scrollToBottom();
-      }
+      if (!ok) return self.completing = false;
+      var list = obj['output'];
+      if (!list.length) return self.completing = false;
+      self._autoComplete = new AutoComplete(list);
+      self.inner.appendChild(self._autoComplete.render());
+      self.scrollToBottom();
     });
   }
 };
@@ -465,21 +448,18 @@ REPLConsole.prototype.onNavigateHistory = function(offset) {
  * Handle control keys like up, down, left, right.
  */
 REPLConsole.prototype.onKeyDown = function(ev) {
-  console.log(ev.keyCode, ev.shiftKey, ev.ctrlKey);
   if (this.completing) {
-    if (ev.keyCode === 9) {
-      // Tab
+    if (ev.keyCode === 9 || ev.keyCode === 16) {
+      // Tab or Shift
+      this.focus();
+      ev.preventDefault();
     } else if (ev.keyCode === 13) {
       // Enter
       this.onEnterKey();
       ev.preventDefault();
-    } else if (ev.keyCode === 16) {
-      // Shift
     } else {
       this.stopCompleting();
     }
-    this.focus();
-    ev.preventDefault();
     return;
   }
 
