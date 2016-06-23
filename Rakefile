@@ -17,6 +17,7 @@ task :patch do
     Pathname.glob(patchdir.join('*.patch')) do |p|
       sh "git am --abort || exit 0"
       sh "git am -3 #{p}"
+      sh "git reset HEAD~"
     end
   end
 end
