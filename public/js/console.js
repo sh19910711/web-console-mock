@@ -44,13 +44,13 @@ function CommandStorage() {
   }
 }
 
-function AutoComplete(list) {
-  this.list = list;
-  this.onKeyDown = this.onKeyDown.bind(this);
-  document.addEventListener('keydown', this.onKeyDown);
-}
+function Autocomplete(words, prefix) {
+  this.words = words.concat();
+  this.words.sort(); // by alphabetically order
+  this.current = -1;
+  this.left = 0;
+  this.right = words.length- 1;
 
-AutoComplete.prototype.render = function() {
   function createKeyword(label) {
     var el = document.createElement('span');
     el.innerText = label;
@@ -61,42 +61,92 @@ AutoComplete.prototype.render = function() {
   this.view = document.createElement('pre');
   addClass(this.view, 'console-message');
   addClass(this.view, 'auto-complete');
-  for (var key in this.list) {
-    this.view.appendChild(createKeyword(this.list[key]));
+  for (var key in this.words) {
+    this.view.appendChild(createKeyword(this.words[key]));
   }
 
-  return this.view;
+  this.inc(prefix);
+}
+
+function startsWith(str, prefix){
+  return str.substr(0, prefix.length) === prefix;
+}
+
+Autocomplete.prototype.inc = function(prefix) {
+  function hide(el) {
+    if (hasClass(el, 'selected')) removeClass(el, 'selected');
+    addClass(el, 'hidden');
+  }
+
+  // TODO: image: => <=
+  while (this.left < this.right) {
+    if (!startsWith(this.words[this.left], prefix)) {
+      hide(this.view.children[this.left]);
+      ++this.left;
+    } else {
+      break;
+    }
+  }
+  while (this.left < this.right) {
+    if (!startsWith(this.words[this.right], prefix)) {
+      hide(this.view.children[this.right]);
+      --this.right;
+    } else {
+      break;
+    }
+  }
+
+  if (this.current < this.left) {
+    this.current = this.left - 1;
+  } else if (this.current > this.right) {
+    this.current = this.right + 1;
+  }
 };
 
-AutoComplete.prototype.getCurrentWord = function() {
-  return this.selected && this.selected.innerText;
+Autocomplete.prototype.dec = function(prefix) {
+  // TODO: image: <= =>
+  while (this.left > 0) {
+    if (startsWith(this.words[this.left-1], prefix)) {
+      --this.left;
+      removeClass(this.view.children[this.left], 'hidden');
+    } else {
+      break;
+    }
+  }
+  while (this.right < this.words.length) {
+    if (startsWith(this.words[this.right+1], prefix)) {
+      ++this.right;
+      removeClass(this.view.children[this.right], 'hidden');
+    } else {
+      break;
+    }
+  }
 };
 
-AutoComplete.prototype.close = function() {
-  document.removeEventListener('keydown', this.onKeyDown);
+Autocomplete.prototype.isSelected = function() {
+  return this.left <= this.current && this.current <= this.right;
+};
+
+Autocomplete.prototype.getCurrentWord = function() {
+  return this.isSelected() && this.words[this.current];
+};
+
+Autocomplete.prototype.close = function() {
   this.view.parentNode.removeChild(this.view);
 };
 
-AutoComplete.prototype.onKeyDown = function(e) {
-  var self = this;
+Autocomplete.prototype.change = function(nextCurrent) {
+  if (this.isSelected()) removeClass(this.view.children[this.current], 'selected');
+  addClass(this.view.children[nextCurrent], 'selected');
+  this.current = nextCurrent;
+};
 
-  function selectItem(el) {
-    if (self.selected) removeClass(self.selected, 'selected');
-    self.selected = el;
-    addClass(el, 'selected');
-  }
-  function first() { return self.view.children[0]; }
-  function last() { return self.view.children[self.view.children.length - 1]; }
+Autocomplete.prototype.next = function() {
+  this.change(this.current + 1 >= this.words.length ? 0 : this.current + 1);
+};
 
-  if (!this.list.length || e.keyCode !== 9) return;
-
-  if (!self.selected) {
-    selectItem(first());
-  } else if (e.shiftKey) {
-    selectItem(self.selected.previousSibling || last());
-  } else {
-    selectItem(self.selected.nextSibling || first());
-  }
+Autocomplete.prototype.back = function() {
+  this.change(this.current - 1 < 0 ? this.words.length - 1 : this.current - 1);
 };
 
 // HTML strings for dynamic elements.
@@ -105,7 +155,7 @@ var consoleInnerHtml = "<div class=\'resizer layer\'><\/div>\n<div class=\'conso
 var promptBoxHtml = "<span class=\'console-prompt-label\'><\/span>\n<pre class=\'console-prompt-display\'><\/pre>\n"
 ;
 // CSS
-var consoleStyleCss = ".console .pos-absolute { position: absolute; }\n.console .pos-fixed { position: fixed; }\n.console .pos-right { right: 0; }\n.console .border-box { box-sizing: border-box; }\n.console .layer { width: 100%; height: 100%; }\n.console .layer.console-outer { z-index: 1; }\n.console .layer.resizer { z-index: 2; }\n.console { position: fixed; left: 0; bottom: 0; width: 100%; height: 148px; padding: 0; margin: 0; background: none repeat scroll 0% 0% #333; z-index: 9999; }\n.console .console-outer { overflow: auto; padding-top: 4px; }\n.console .console-inner { font-family: monospace; font-size: 11px; width: 100%; height: 100%; overflow: none; background: #333; }\n.console .console-prompt-box { color: #FFF; }\n.console .console-message { color: #1AD027; margin: 0; border: 0; white-space: pre-wrap; background-color: #333; padding: 0; }\n.console .console-message.error-message { color: #fc9; }\n.console .console-message.auto-complete { word-break: break-all; }\n.console .console-message.auto-complete .keyword { margin-right: 11px; }\n.console .console-message.auto-complete .keyword.selected { background: #FFF; color: #000; }\n.console .console-focus .console-cursor { background: #FEFEFE; color: #333; font-weight: bold; }\n.console .resizer { background: #333; width: 100%; height: 4px; cursor: ns-resize; }\n.console .console-actions { padding-right: 3px; }\n.console .console-actions .button { float: left; }\n.console .button { cursor: pointer; border-radius: 1px; font-family: monospace; font-size: 13px; width: 14px; height: 14px; line-height: 14px; text-align: center; color: #ccc; }\n.console .button:hover { background: #666; color: #fff; }\n.console .button.close-button:hover { background: #966; }\n.console .clipboard { height: 0px; padding: 0px; margin: 0px; width: 0px; margin-left: -1000px; }\n.console .console-prompt-label { display: inline; color: #FFF; background: none repeat scroll 0% 0% #333; border: 0; padding: 0; }\n.console .console-prompt-display { display: inline; color: #FFF; background: none repeat scroll 0% 0% #333; border: 0; padding: 0; }\n.console.full-screen { height: 100%; }\n.console.full-screen .console-outer { padding-top: 3px; }\n.console.full-screen .resizer { display: none; }\n.console.full-screen .close-button { display: none; }\n"
+var consoleStyleCss = ".console .pos-absolute { position: absolute; }\n.console .pos-fixed { position: fixed; }\n.console .pos-right { right: 0; }\n.console .border-box { box-sizing: border-box; }\n.console .layer { width: 100%; height: 100%; }\n.console .layer.console-outer { z-index: 1; }\n.console .layer.resizer { z-index: 2; }\n.console { position: fixed; left: 0; bottom: 0; width: 100%; height: 148px; padding: 0; margin: 0; background: none repeat scroll 0% 0% #333; z-index: 9999; }\n.console .console-outer { overflow: auto; padding-top: 4px; }\n.console .console-inner { font-family: monospace; font-size: 11px; width: 100%; height: 100%; overflow: none; background: #333; }\n.console .console-prompt-box { color: #FFF; }\n.console .console-message { color: #1AD027; margin: 0; border: 0; white-space: pre-wrap; background-color: #333; padding: 0; }\n.console .console-message.error-message { color: #fc9; }\n.console .console-message.auto-complete { word-break: break-all; }\n.console .console-message.auto-complete .keyword { margin-right: 11px; }\n.console .console-message.auto-complete .keyword.selected { background: #FFF; color: #000; }\n.console .console-message.auto-complete .hidden { display: none; }\n.console .console-focus .console-cursor { background: #FEFEFE; color: #333; font-weight: bold; }\n.console .resizer { background: #333; width: 100%; height: 4px; cursor: ns-resize; }\n.console .console-actions { padding-right: 3px; }\n.console .console-actions .button { float: left; }\n.console .button { cursor: pointer; border-radius: 1px; font-family: monospace; font-size: 13px; width: 14px; height: 14px; line-height: 14px; text-align: center; color: #ccc; }\n.console .button:hover { background: #666; color: #fff; }\n.console .button.close-button:hover { background: #966; }\n.console .clipboard { height: 0px; padding: 0px; margin: 0px; width: 0px; margin-left: -1000px; }\n.console .console-prompt-label { display: inline; color: #FFF; background: none repeat scroll 0% 0% #333; border: 0; padding: 0; }\n.console .console-prompt-display { display: inline; color: #FFF; background: none repeat scroll 0% 0% #333; border: 0; padding: 0; }\n.console.full-screen { height: 100%; }\n.console.full-screen .console-outer { padding-top: 3px; }\n.console.full-screen .resizer { display: none; }\n.console.full-screen .close-button { display: none; }\n"
 ;
 // Insert a style element with the unique ID
 var styleElementId = 'sr02459pvbvrmhco';
@@ -331,6 +381,7 @@ REPLConsole.prototype.removeCaretFromPrompt = function() {
 };
 
 REPLConsole.prototype.setInput = function(input, caretPos) {
+  if (typeof input === 'undefined') return; // keep value if input is undefined
   this._caretPos = caretPos === undefined ? input.length : caretPos;
   this._input = input;
   this.renderInput();
@@ -395,23 +446,7 @@ REPLConsole.prototype.writeError = function(output) {
   return consoleMessage;
 };
 
-REPLConsole.prototype.stopCompleting = function() {
-  if (!this.completing) return;
-
-  var result = this._autoComplete.getCurrentWord();
-  this.completing = false;
-  this._autoComplete.close();
-
-  return result;
-};
-
 REPLConsole.prototype.onEnterKey = function() {
-  if (this.completing) {
-    var res = this.stopCompleting();
-    if (res) this.setInput(res);
-    return;
-  }
-
   var input = this._input;
 
   if(input != "" && input !== undefined) {
@@ -425,18 +460,14 @@ REPLConsole.prototype.onTabKey = function() {
   var input = this._input;
   var self = this;
 
-  if (!self.completing) {
-    var cmd = "::WebConsole::WebAPI.complete('" + self.sessionId + "', '" + input + "')";
-    self.completing = true;
-    self.commandHandle(cmd, function(ok, obj) {
-      if (!ok) return self.completing = false;
-      var list = obj['output'];
-      if (!list.length) return self.completing = false;
-      self._autoComplete = new AutoComplete(list);
-      self.inner.appendChild(self._autoComplete.render());
-      self.scrollToBottom();
-    });
-  }
+  self.completing = true;
+  self.commandHandle("nil", function(ok, obj) {
+    if (!ok) return self.completing = false;
+    if (!obj['context'].length) return self.completing = false;
+    self._autoComplete = new Autocomplete(obj['context'], self.getWordOnCaret());
+    self.inner.appendChild(self._autoComplete.view);
+    self.scrollToBottom();
+  });
 };
 
 REPLConsole.prototype.onNavigateHistory = function(offset) {
@@ -449,27 +480,28 @@ REPLConsole.prototype.onNavigateHistory = function(offset) {
  */
 REPLConsole.prototype.onKeyDown = function(ev) {
   if (this.completing) {
-    if (ev.keyCode === 9 || ev.keyCode === 16) {
-      // Tab or Shift
-      this.focus();
+    if (ev.keyCode === 9) { // TAB key
+      if (ev.shiftKey) {
+        this._autoComplete.back();
+      } else {
+        this._autoComplete.next();
+      }
+    } else if (ev.keyCode === 13) { // Enter key
+      this.setInput(this._autoComplete.getCurrentWord());
+      this.completing = false;
+      this._autoComplete.close();
       ev.preventDefault();
-    } else if (ev.keyCode === 13) {
-      // Enter
-      this.onEnterKey();
-      ev.preventDefault();
-    } else {
-      this.stopCompleting();
+      ev.stopPropagation();
+      return;
     }
-    return;
   }
 
   switch (ev.keyCode) {
     case 9:
       // Tab
-      this.onTabKey();
-      this.focus();
+      if (!this.completing) this.onTabKey();
       ev.preventDefault();
-      return true;
+      break;
     case 13:
       // Enter key
       this.onEnterKey();
@@ -539,6 +571,9 @@ REPLConsole.prototype.onKeyPress = function(ev) {
   if (ev.ctrlKey || ev.metaKey) { return; }
   var keyCode = ev.keyCode || ev.which;
   this.insertAtCurrent(String.fromCharCode(keyCode));
+  if (this.completing) {
+    this._autoComplete.inc(this.getWordOnCaret());
+  }
   ev.stopPropagation();
   ev.preventDefault();
 };
@@ -562,6 +597,17 @@ REPLConsole.prototype.insertAtCurrent = function(char) {
   var before = this._input.substring(0, this._caretPos);
   var after = this._input.substring(this._caretPos, this._input.length);
   this.setInput(before + char + after, this._caretPos + 1);
+};
+
+REPLConsole.prototype.getWordOnCaret = function() {
+  function find(s, pos) {
+    var left = s.lastIndexOf(' ', pos);
+    if (left === -1) left = 0;
+    var right = s.indexOf(' ', pos)
+    if (right === -1) right = s.length - 1;
+    return s.substr(left, right - left + 1).replace(/^\s+|\s+$/g,'');
+  }
+  return find(this._input, this._caretPos);
 };
 
 REPLConsole.prototype.scrollToBottom = function() {
