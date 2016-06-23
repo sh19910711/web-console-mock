@@ -48,8 +48,9 @@ function Autocomplete(words, prefix) {
   this.words = words.concat();
   this.words.sort(); // by alphabetically order
   this.current = -1;
+  // [left, right)
   this.left = 0;
-  this.right = words.length- 1;
+  this.right = words.length;
 
   function createKeyword(label) {
     var el = document.createElement('span');
@@ -88,8 +89,8 @@ Autocomplete.prototype.inc = function(prefix) {
     }
   }
   while (this.left < this.right) {
-    if (!startsWith(this.words[this.right], prefix)) {
-      hide(this.view.children[this.right]);
+    if (!startsWith(this.words[this.right - 1], prefix)) {
+      hide(this.view.children[this.right - 1]);
       --this.right;
     } else {
       break;
@@ -124,7 +125,7 @@ Autocomplete.prototype.dec = function(prefix) {
 };
 
 Autocomplete.prototype.isSelected = function() {
-  return this.left <= this.current && this.current <= this.right;
+  return this.left <= this.current && this.current < this.right;
 };
 
 Autocomplete.prototype.getCurrentWord = function() {
