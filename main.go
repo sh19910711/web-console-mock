@@ -19,7 +19,8 @@ func index(c web.C, w http.ResponseWriter, r *http.Request) {
 }
 
 type CompleteResponse struct {
-  Output []string `json:"output"`
+  Output string `json:"output"`
+  Context []string `json:"context"`
 }
 
 type OutputResponse struct {
@@ -30,7 +31,8 @@ func update_session(c web.C, w http.ResponseWriter, r *http.Request) {
   var output interface {}
   if r.FormValue("rawdata") == "true" {
     output = &CompleteResponse {
-      Output: []string{"something", "another", "one_more_thing"},
+      Output: "nil",
+      Context: []string{"something", "somewhat", "somewhere", "another", "one_more_thing"},
     }
   } else {
     output = &OutputResponse {
