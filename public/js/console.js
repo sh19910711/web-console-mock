@@ -48,9 +48,9 @@ function Autocomplete(words, prefix) {
   this.words = words.concat();
   this.words.sort(); // by alphabetically order
   this.current = -1;
-  // [left, right)
-  this.left = 0;
+  this.left = 0; // [left, right)
   this.right = words.length;
+  this.confirmed = false;
 
   function createKeyword(label) {
     var el = document.createElement('span');
@@ -69,29 +69,56 @@ function Autocomplete(words, prefix) {
   this.inc(prefix);
 }
 
-function startsWith(str, prefix){
-  return str.substr(0, prefix.length) === prefix;
+Autocomplete.prototype.onClose = function(callback) {
+  this.onCloseCallback = callback;
+  if (this.confirmed) callback(this.confirmed);
+};
+
+function startsWith(str, prefix) {
+  return prefix && str.substr(0, prefix.length) === prefix;
 }
 
-Autocomplete.prototype.inc = function(prefix) {
-  function hide(el) {
+Autocomplete.prototype.flip = function(prefix, incrementally) {
+  var self = this;
+
+  function toggle(el) {
     if (hasClass(el, 'selected')) removeClass(el, 'selected');
-    addClass(el, 'hidden');
+    if (incrementally) {
+      addClass(el, 'hidden');
+    } else {
+      removeClass(el, 'hidden');
+    }
   }
 
-  // TODO: image: => <=
-  while (this.left < this.right) {
-    if (!startsWith(this.words[this.left], prefix)) {
-      hide(this.view.children[this.left]);
-      ++this.left;
+  function condLeft(incrementally) {
+    if (incrementally) {
+      return self.left < self.right;
+    } else {
+      return 0 <= self.left;
+    }
+  }
+
+  function condRight(incrementally) {
+    if (incrementally) {
+      return self.left < self.right - 1;
+    } else {
+      return self.right - 1 < self.words.length;
+    }
+  }
+
+  while (condLeft(incrementally)) {
+    if (incrementally !== startsWith(this.words[this.left], prefix)) {
+      toggle(this.view.children[this.left]);
+      this.left += incrementally ? 1 : -1;
     } else {
       break;
     }
   }
-  while (this.left < this.right) {
-    if (!startsWith(this.words[this.right - 1], prefix)) {
-      hide(this.view.children[this.right - 1]);
-      --this.right;
+
+  while (condRight(incrementally)) {
+    if (incrementally !== startsWith(this.words[this.right - 1], prefix)) {
+      toggle(this.view.children[this.right - 1]);
+      this.right += incrementally ? -1 : 1;
     } else {
       break;
     }
@@ -100,28 +127,20 @@ Autocomplete.prototype.inc = function(prefix) {
   if (this.current < this.left) {
     this.current = this.left - 1;
   } else if (this.current > this.right) {
-    this.current = this.right + 1;
+    this.current = this.right;
+  }
+  if (this.left + 1 >= this.right) {
+    this.current = this.left;
+    this.confirm();
   }
 };
 
+Autocomplete.prototype.inc = function(prefix) {
+  this.flip(prefix, true);
+};
+
 Autocomplete.prototype.dec = function(prefix) {
-  // TODO: image: <= =>
-  while (this.left > 0) {
-    if (startsWith(this.words[this.left-1], prefix)) {
-      --this.left;
-      removeClass(this.view.children[this.left], 'hidden');
-    } else {
-      break;
-    }
-  }
-  while (this.right < this.words.length) {
-    if (startsWith(this.words[this.right+1], prefix)) {
-      ++this.right;
-      removeClass(this.view.children[this.right], 'hidden');
-    } else {
-      break;
-    }
-  }
+  this.flip(prefix, false);
 };
 
 Autocomplete.prototype.isSelected = function() {
@@ -132,22 +151,40 @@ Autocomplete.prototype.getCurrentWord = function() {
   return this.isSelected() && this.words[this.current];
 };
 
-Autocomplete.prototype.close = function() {
-  this.view.parentNode.removeChild(this.view);
+Autocomplete.prototype.confirm = function() {
+  if (this.left <= this.current && this.current < this.right) {
+    if (this.onCloseCallback) this.onCloseCallback(this.words[this.current]);
+    this.removeView();
+    this.confirmed = this.words[this.current];
+  } else {
+    this.cancel();
+  }
+};
+
+Autocomplete.prototype.removeView = function() {
+  if (this.view.parentNode) this.view.parentNode.removeChild(this.view);
+  removeAllChildren(this.view);
+}
+
+Autocomplete.prototype.cancel = function() {
+  if (this.onCloseCallback) this.onCloseCallback();
+  this.removeView();
+  this.confirmed = this.words[this.current];
 };
 
 Autocomplete.prototype.change = function(nextCurrent) {
+  if (this.confirmed) return;
   if (this.isSelected()) removeClass(this.view.children[this.current], 'selected');
   addClass(this.view.children[nextCurrent], 'selected');
   this.current = nextCurrent;
 };
 
 Autocomplete.prototype.next = function() {
-  this.change(this.current + 1 >= this.words.length ? 0 : this.current + 1);
+  this.change(this.current + 1 >= this.right ? this.left : this.current + 1);
 };
 
 Autocomplete.prototype.back = function() {
-  this.change(this.current - 1 < 0 ? this.words.length - 1 : this.current - 1);
+  this.change(this.current - 1 < this.left ? this.right - 1 : this.current - 1);
 };
 
 // HTML strings for dynamic elements.
@@ -188,10 +225,6 @@ REPLConsole.prototype.commandHandle = function(line, callback) {
   var params = 'input=' + encodeURIComponent(line);
   callback = callback || function() {};
 
-  if (this.completing) {
-    params += '&rawdata=true';
-  }
-
   function isSuccess(status) {
     return status >= 200 && status < 300 || status === 304;
   }
@@ -209,6 +242,21 @@ REPLConsole.prototype.commandHandle = function(line, callback) {
       return "Oops! Failed to connect to the Web Console middleware.\nPlease make sure a rails development server is running.\n";
     } else {
       return xhr.status + ' ' + xhr.statusText;
+    }
+  }
+
+  function getContext() {
+    var s = self.getWordOnCaret();
+    var methodOp = s.lastIndexOf('.');
+    var moduleOp = s.lastIndexOf('::');
+    var x = methodOp > moduleOp ? methodOp : moduleOp;
+    if (x !== -1) return s.substr(0, x);
+  }
+
+  var context;
+  if (this.completing) {
+    if (context = getContext()) {
+      params += '&context=' + context;
     }
   }
 
@@ -463,9 +511,13 @@ REPLConsole.prototype.onTabKey = function() {
 
   self.completing = true;
   self.commandHandle("nil", function(ok, obj) {
-    if (!ok) return self.completing = false;
-    if (!obj['context'].length) return self.completing = false;
+    if (!ok) return self._autoComplete.cancel();
+    if (!obj['context'].length) return self._autoComplete.cancel();
     self._autoComplete = new Autocomplete(obj['context'], self.getWordOnCaret());
+    self._autoComplete.onClose(function(word) {
+      if (word) self.setInput(word);
+      self.completing = false;
+    });
     self.inner.appendChild(self._autoComplete.view);
     self.scrollToBottom();
   });
@@ -480,7 +532,7 @@ REPLConsole.prototype.onNavigateHistory = function(offset) {
  * Handle control keys like up, down, left, right.
  */
 REPLConsole.prototype.onKeyDown = function(ev) {
-  if (this.completing) {
+  if (this.completing && this._autoComplete) {
     if (ev.keyCode === 9) { // TAB key
       if (ev.shiftKey) {
         this._autoComplete.back();
@@ -488,12 +540,13 @@ REPLConsole.prototype.onKeyDown = function(ev) {
         this._autoComplete.next();
       }
     } else if (ev.keyCode === 13) { // Enter key
-      this.setInput(this._autoComplete.getCurrentWord());
-      this.completing = false;
-      this._autoComplete.close();
+      this.swapWordOnCaret(this._autoComplete.getCurrentWord());
+      this._autoComplete.confirm();
       ev.preventDefault();
       ev.stopPropagation();
       return;
+    } else if (ev.keyCode == 27) { // ESC
+      this._autoComplete.cancel();
     }
   }
 
@@ -540,6 +593,9 @@ REPLConsole.prototype.onKeyDown = function(ev) {
     case 8:
       // Delete
       this.deleteAtCurrent();
+      if (this.completing) {
+        this._autoComplete.dec(this.getWordOnCaret());
+      }
       ev.preventDefault();
       break;
     default:
@@ -600,15 +656,29 @@ REPLConsole.prototype.insertAtCurrent = function(char) {
   this.setInput(before + char + after, this._caretPos + 1);
 };
 
+REPLConsole.prototype.swapWordOnCaret = function(next) {
+  function right(s, pos) {
+    var x = s.indexOf(' ', pos);
+    return x === -1 ? s.length : x;
+  }
+
+  function swap(s, pos) {
+    return s.substr(0, s.lastIndexOf(' ', pos) + 1) + next + s.substr(right(s, pos))
+  }
+
+  if (!next) return;
+  var swapped = swap(this._input, this._caretPos);
+  this.setInput(swapped, this._caretPos + swapped.length - this._input.length);
+};
+
 REPLConsole.prototype.getWordOnCaret = function() {
-  function find(s, pos) {
+  return (function(s, pos) {
     var left = s.lastIndexOf(' ', pos);
     if (left === -1) left = 0;
     var right = s.indexOf(' ', pos)
     if (right === -1) right = s.length - 1;
     return s.substr(left, right - left + 1).replace(/^\s+|\s+$/g,'');
-  }
-  return find(this._input, this._caretPos);
+  })(this._input, this._caretPos);
 };
 
 REPLConsole.prototype.scrollToBottom = function() {

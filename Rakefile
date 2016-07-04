@@ -11,7 +11,7 @@ directory 'public/js'
 task :build => [:stash, :patch, 'ext:lib:templates', 'public/js', :copy, :stash_pop]
 
 task :copy do
-  cp Pathname(spec.gem_dir).join('tmp/lib/console.js'), pwd.join('public/js/console.js')
+  cp Pathname(spec.gem_dir).join('extensions/tmp/lib/console.js'), pwd.join('public/js/console.js')
 end
 
 task :stash do
