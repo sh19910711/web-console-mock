@@ -25,11 +25,12 @@ type CompleteResponse struct {
 
 type OutputResponse struct {
   Output string `json:"output"`
+  Context []string `json:"context"`
 }
 
 func update_session(c web.C, w http.ResponseWriter, r *http.Request) {
   var output interface {}
-  if r.FormValue("rawdata") == "true" {
+  if r.FormValue("input") == "nil" {
     output = &CompleteResponse {
       Output: "nil",
       Context: []string{"something", "somewhat", "somewhere", "another", "one_more_thing"},
