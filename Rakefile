@@ -8,18 +8,28 @@ load "#{spec.gem_dir}/lib/web_console/tasks/extensions.rake"
 
 directory 'public/js'
 
-task :build => [:stash, :patch, 'ext:lib:templates', 'public/js', :copy, :stash_pop]
+task :build => [:stash, :patch, :templates, 'public/js', :copy, :stash_pop]
+
+task :templates do
+  cd spec.gem_dir do
+    sh "bundle exec rake ext:lib:templates"
+  end
+end
 
 task :copy do
   cp Pathname(spec.gem_dir).join('extensions/tmp/lib/console.js'), pwd.join('public/js/console.js')
 end
 
 task :stash do
-  cd spec.gem_dir { sh "git stash" }
+  cd spec.gem_dir do
+    sh "git stash"
+  end
 end
 
 task :stash_pop do
-  cd spec.gem_dir { sh "git stash pop" }
+  cd spec.gem_dir do
+    sh "git stash pop"
+  end
 end
 
 task :patch do
