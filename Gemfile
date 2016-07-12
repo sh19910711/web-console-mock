@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-gem 'rails', '5.0.0.rc1'
+gem 'rails', '~> 5.0.0'
 
 if Dir.exists?(File.expand_path('~/workspace/web-console'))
 	gem 'web-console', :path => '~/workspace/web-console'
