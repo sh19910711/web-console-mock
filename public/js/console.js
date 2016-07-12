@@ -45,7 +45,7 @@ function CommandStorage() {
 }
 
 function Autocomplete(words, prefix) {
-  this.words = words.concat();
+  this.words = words.concat(); // to clone object
   this.words.sort(); // by alphabetically order
   this.current = -1;
   this.left = 0; // [left, right)
@@ -66,94 +66,65 @@ function Autocomplete(words, prefix) {
     this.view.appendChild(createKeyword(this.words[key]));
   }
 
-  this.inc(prefix);
+  this.refine(prefix, true);
 }
 
-Autocomplete.prototype.onClose = function(callback) {
-  this.onCloseCallback = callback;
+Autocomplete.prototype.onFinished = function(callback) {
+  this.onFinishedCallback = callback;
   if (this.confirmed) callback(this.confirmed);
 };
 
-function startsWith(str, prefix) {
-  return prefix && str.substr(0, prefix.length) === prefix;
-}
-
-Autocomplete.prototype.flip = function(prefix, incrementally) {
+Autocomplete.prototype.refine = function(prefix, inc) {
   var self = this;
 
   function toggle(el) {
     if (hasClass(el, 'selected')) removeClass(el, 'selected');
-    if (incrementally) {
-      addClass(el, 'hidden');
-    } else {
-      removeClass(el, 'hidden');
-    }
+    return inc ? addClass(el, 'hidden') : removeClass(el, 'hidden');
   }
 
-  function condLeft(incrementally) {
-    if (incrementally) {
-      return self.left < self.right;
-    } else {
-      return 0 <= self.left;
-    }
+  function startsWith(str, prefix) {
+    return !prefix || str.substr(0, prefix.length) === prefix;
   }
 
-  function condRight(incrementally) {
-    if (incrementally) {
-      return self.left < self.right - 1;
-    } else {
-      return self.right - 1 < self.words.length;
+  function moveRight(l, r) {
+    while (l < r && inc !== startsWith(self.words[l], prefix)) {
+      toggle(self.view.children[l]);
+      ++ l;
     }
+    return l;
   }
 
-  while (condLeft(incrementally)) {
-    if (incrementally !== startsWith(this.words[this.left], prefix)) {
-      toggle(this.view.children[this.left]);
-      this.left += incrementally ? 1 : -1;
-    } else {
-      break;
+  function moveLeft(l, r) {
+    while (l < r - 1 && inc !== startsWith(self.words[r - 1], prefix)) {
+      toggle(self.view.children[r - 1]);
+      -- r;
     }
+    return r;
   }
 
-  while (condRight(incrementally)) {
-    if (incrementally !== startsWith(this.words[this.right - 1], prefix)) {
-      toggle(this.view.children[this.right - 1]);
-      this.right += incrementally ? -1 : 1;
-    } else {
-      break;
-    }
+  if (inc) {
+    self.left = moveRight(self.left, self.right);
+    self.right = moveLeft(self.left, self.right);
+  } else {
+    self.left = moveLeft(0, self.left);
+    self.right = moveRight(self.right, self.words.length);
   }
 
-  if (this.current < this.left) {
-    this.current = this.left - 1;
-  } else if (this.current > this.right) {
-    this.current = this.right;
+  if (self.current < self.left) {
+    self.current = self.left - 1;
+  } else if (self.current > self.right) {
+    self.current = self.right;
   }
-  if (this.left + 1 >= this.right) {
-    this.current = this.left;
-    this.confirm();
+
+  if (self.left + 1 >= self.right) {
+    self.current = self.left;
+    self.finish();
   }
 };
 
-Autocomplete.prototype.inc = function(prefix) {
-  this.flip(prefix, true);
-};
-
-Autocomplete.prototype.dec = function(prefix) {
-  this.flip(prefix, false);
-};
-
-Autocomplete.prototype.isSelected = function() {
-  return this.left <= this.current && this.current < this.right;
-};
-
-Autocomplete.prototype.getCurrentWord = function() {
-  return this.isSelected() && this.words[this.current];
-};
-
-Autocomplete.prototype.confirm = function() {
+Autocomplete.prototype.finish = function() {
   if (this.left <= this.current && this.current < this.right) {
-    if (this.onCloseCallback) this.onCloseCallback(this.words[this.current]);
+    if (this.onFinishedCallback) this.onFinishedCallback(this.words[this.current]);
     this.removeView();
     this.confirmed = this.words[this.current];
   } else {
@@ -161,30 +132,28 @@ Autocomplete.prototype.confirm = function() {
   }
 };
 
+Autocomplete.prototype.cancel = function() {
+  if (this.onFinishedCallback) this.onFinishedCallback();
+  this.removeView();
+};
+
 Autocomplete.prototype.removeView = function() {
   if (this.view.parentNode) this.view.parentNode.removeChild(this.view);
   removeAllChildren(this.view);
 }
 
-Autocomplete.prototype.cancel = function() {
-  if (this.onCloseCallback) this.onCloseCallback();
-  this.removeView();
-  this.confirmed = this.words[this.current];
-};
-
-Autocomplete.prototype.change = function(nextCurrent) {
-  if (this.confirmed) return;
-  if (this.isSelected()) removeClass(this.view.children[this.current], 'selected');
+Autocomplete.prototype.select = function(nextCurrent) {
+  if (0 <= this.current && this.current < this.words.length) removeClass(this.view.children[this.current], 'selected');
   addClass(this.view.children[nextCurrent], 'selected');
   this.current = nextCurrent;
 };
 
 Autocomplete.prototype.next = function() {
-  this.change(this.current + 1 >= this.right ? this.left : this.current + 1);
+  this.select(this.current + 1 >= this.right ? this.left : this.current + 1);
 };
 
 Autocomplete.prototype.back = function() {
-  this.change(this.current - 1 < this.left ? this.right - 1 : this.current - 1);
+  this.select(this.current - 1 < this.left ? this.right - 1 : this.current - 1);
 };
 
 // HTML strings for dynamic elements.
@@ -208,7 +177,7 @@ function REPLConsole(config) {
   this.prompt = getConfig('promptLabel', ' >>');
   this.mountPoint = getConfig('mountPoint');
   this.sessionId = getConfig('sessionId');
-  this.completing = false;
+  this.autocomplete = false;
 }
 
 REPLConsole.prototype.getSessionUrl = function(path) {
@@ -246,18 +215,16 @@ REPLConsole.prototype.commandHandle = function(line, callback) {
   }
 
   function getContext() {
-    var s = self.getWordOnCaret();
+    var s = self.getCurrentWord();
     var methodOp = s.lastIndexOf('.');
     var moduleOp = s.lastIndexOf('::');
     var x = methodOp > moduleOp ? methodOp : moduleOp;
     if (x !== -1) return s.substr(0, x);
   }
 
-  var context;
-  if (this.completing) {
-    if (context = getContext()) {
-      params += '&context=' + context;
-    }
+  if (this.autocomplete) {
+    var c = getContext();
+    params += c ? '&context=' + c : c;
   }
 
   putRequest(self.getSessionUrl(), params, function(xhr) {
@@ -479,7 +446,7 @@ REPLConsole.prototype.renderInput = function() {
 };
 
 REPLConsole.prototype.writeOutput = function(output) {
-  if (this.completing) return;
+  if (this.autocomplete) return;
   var consoleMessage = document.createElement('pre');
   consoleMessage.className = "console-message";
   consoleMessage.innerHTML = escapeHTML(output);
@@ -489,7 +456,7 @@ REPLConsole.prototype.writeOutput = function(output) {
 };
 
 REPLConsole.prototype.writeError = function(output) {
-  if (this.completing) return;
+  if (this.autocomplete) return;
   var consoleMessage = this.writeOutput(output);
   addClass(consoleMessage, "error-message");
   return consoleMessage;
@@ -509,16 +476,17 @@ REPLConsole.prototype.onTabKey = function() {
   var input = this._input;
   var self = this;
 
-  self.completing = true;
+  if (self.autocomplete) return;
+  self.autocomplete = new Autocomplete([]);
+
   self.commandHandle("nil", function(ok, obj) {
-    if (!ok) return self._autoComplete.cancel();
-    if (!obj['context'].length) return self._autoComplete.cancel();
-    self._autoComplete = new Autocomplete(obj['context'], self.getWordOnCaret());
-    self._autoComplete.onClose(function(word) {
-      if (word) self.setInput(word);
-      self.completing = false;
+    if (!ok) return self.autocomplete = false;
+    self.autocomplete = new Autocomplete(obj['context'], self.getCurrentWord());
+    self.inner.appendChild(self.autocomplete.view);
+    self.autocomplete.onFinished(function(word) {
+      self.swapCurrentWord(word);
+      self.autocomplete = false;
     });
-    self.inner.appendChild(self._autoComplete.view);
     self.scrollToBottom();
   });
 };
@@ -532,28 +500,34 @@ REPLConsole.prototype.onNavigateHistory = function(offset) {
  * Handle control keys like up, down, left, right.
  */
 REPLConsole.prototype.onKeyDown = function(ev) {
-  if (this.completing && this._autoComplete) {
-    if (ev.keyCode === 9) { // TAB key
-      if (ev.shiftKey) {
-        this._autoComplete.back();
-      } else {
-        this._autoComplete.next();
+  if (this.autocomplete) {
+    function check(self) {
+      if (ev.keyCode === 9) { // TAB
+        if (ev.shiftKey) {
+          self.autocomplete.back();
+        } else {
+          self.autocomplete.next();
+        }
+        return true;
+      } else if (ev.keyCode === 13) { // Enter
+        self.autocomplete.finish();
+        return true;
+      } else if (ev.keyCode == 27) { // ESC
+        self.autocomplete.cancel();
+        return true;
       }
-    } else if (ev.keyCode === 13) { // Enter key
-      this.swapWordOnCaret(this._autoComplete.getCurrentWord());
-      this._autoComplete.confirm();
+    }
+    if (check(this)) {
       ev.preventDefault();
       ev.stopPropagation();
       return;
-    } else if (ev.keyCode == 27) { // ESC
-      this._autoComplete.cancel();
     }
   }
 
   switch (ev.keyCode) {
     case 9:
       // Tab
-      if (!this.completing) this.onTabKey();
+      this.onTabKey();
       ev.preventDefault();
       break;
     case 13:
@@ -593,9 +567,7 @@ REPLConsole.prototype.onKeyDown = function(ev) {
     case 8:
       // Delete
       this.deleteAtCurrent();
-      if (this.completing) {
-        this._autoComplete.dec(this.getWordOnCaret());
-      }
+      if (this.autocomplete) this.autocomplete.refine(this.getCurrentWord(), false);
       ev.preventDefault();
       break;
     default:
@@ -628,9 +600,7 @@ REPLConsole.prototype.onKeyPress = function(ev) {
   if (ev.ctrlKey || ev.metaKey) { return; }
   var keyCode = ev.keyCode || ev.which;
   this.insertAtCurrent(String.fromCharCode(keyCode));
-  if (this.completing) {
-    this._autoComplete.inc(this.getWordOnCaret());
-  }
+  if (this.autocomplete) this.autocomplete.refine(this.getCurrentWord(), true);
   ev.stopPropagation();
   ev.preventDefault();
 };
@@ -656,7 +626,7 @@ REPLConsole.prototype.insertAtCurrent = function(char) {
   this.setInput(before + char + after, this._caretPos + 1);
 };
 
-REPLConsole.prototype.swapWordOnCaret = function(next) {
+REPLConsole.prototype.swapCurrentWord = function(next) {
   function right(s, pos) {
     var x = s.indexOf(' ', pos);
     return x === -1 ? s.length : x;
@@ -671,7 +641,7 @@ REPLConsole.prototype.swapWordOnCaret = function(next) {
   this.setInput(swapped, this._caretPos + swapped.length - this._input.length);
 };
 
-REPLConsole.prototype.getWordOnCaret = function() {
+REPLConsole.prototype.getCurrentWord = function() {
   return (function(s, pos) {
     var left = s.lastIndexOf(' ', pos);
     if (left === -1) left = 0;
