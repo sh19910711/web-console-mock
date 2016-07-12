@@ -224,7 +224,7 @@ REPLConsole.prototype.commandHandle = function(line, callback) {
 
   if (this.autocomplete) {
     var c = getContext();
-    params += c ? '&context=' + c : c;
+    params += c ? '&context=' + c : '';
   }
 
   putRequest(self.getSessionUrl(), params, function(xhr) {
