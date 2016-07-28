@@ -1,3 +1,6 @@
+.PHONY: all
+all: init build
+
 .PHONY: build
 build:
 	govendor sync
