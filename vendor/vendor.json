@@ -1,5 +1,11 @@
 {
 	"comment": "",
+	"heroku": {
+		"goVersion": "go1.6",
+		"install": [
+			"./..."
+		]
+	},
 	"ignore": "test",
 	"package": [
 		{
@@ -45,9 +51,5 @@
 			"revisionTime": "2016-05-07T20:19:45Z"
 		}
 	],
-	"rootPath": "web-console-mock",
-	"heroku": {
-		"install" : [ "./..." ],
-		"goVersion": "go1.6"
-	}
+	"rootPath": "github.com/sh19910711/web-console-mock"
 }
