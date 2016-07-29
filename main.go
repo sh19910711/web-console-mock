@@ -33,7 +33,7 @@ func update_session(c web.C, w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("input") == "nil" {
 		output = &CompleteResponse{
 			Output:  "nil",
-			Context: []string{"another", "something", "somewhat", "somewhere", "one_more_thing", "yet another thing"},
+			Context: []string{"another", "somehow", "something", "somewhat", "somewhere", "one_more_thing", "yet_another_thing"},
 		}
 	} else {
 		output = &OutputResponse{
