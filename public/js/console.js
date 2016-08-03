@@ -82,7 +82,7 @@ Autocomplete.prototype.currentWord = function() {
 
 Autocomplete.prototype.onFinished = function(callback) {
   this.onFinishedCallback = callback;
-  if (this.confirmed) callback(this.confirmed);
+  if (this.confirmed || this.canceled) callback(this.confirmed);
 };
 
 Autocomplete.prototype.onKeyDown = function(ev) {
@@ -187,9 +187,11 @@ Autocomplete.prototype.refine = function(prefix) {
   }
   self.trim(this.current, false);
 
-  if (self.left + 1 >= self.right) {
+  if (self.left + 1 == self.right) {
     self.current = self.left;
     self.finish();
+  } else if (self.left == self.right) {
+    self.cancel();
   }
 };
 
@@ -205,6 +207,7 @@ Autocomplete.prototype.finish = function() {
 
 Autocomplete.prototype.cancel = function() {
   if (this.onFinishedCallback) this.onFinishedCallback();
+  this.canceled = true;
   this.removeView();
 };
 
@@ -543,7 +546,7 @@ REPLConsole.prototype.onTabKey = function() {
     self.autocomplete = new Autocomplete(obj['context'], self.getCurrentWord());
     self.inner.appendChild(self.autocomplete.view);
     self.autocomplete.onFinished(function(word) {
-      self.swapCurrentWord(word);
+      if (word) self.swapCurrentWord(word);
       self.autocomplete = false;
     });
     self.scrollToBottom();
