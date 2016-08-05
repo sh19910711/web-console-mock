@@ -3,20 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/zenazn/goji"
 	"github.com/zenazn/goji/web"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 )
-
-func index(c web.C, w http.ResponseWriter, r *http.Request) {
-	buf, err := ioutil.ReadFile("index.html")
-	if err != nil {
-		http.Error(w, http.StatusText(500), 500)
-		return
-	}
-	w.Write(buf)
-}
 
 type CompleteResponse struct {
 	Output  string   `json:"output"`
@@ -28,24 +22,53 @@ type OutputResponse struct {
 	Context []string `json:"context"`
 }
 
-func update_session(c web.C, w http.ResponseWriter, r *http.Request) {
+func index(c web.C, w http.ResponseWriter, r *http.Request) {
+	if buf, err := ioutil.ReadFile("index.html"); err == nil {
+		w.Write(buf)
+	} else {
+		http.Error(w, err.Error(), 500)
+	}
+}
+
+func updateSession(c web.C, w http.ResponseWriter, r *http.Request) {
 	var output interface{}
 	if r.FormValue("input") == "nil" {
-		output = &CompleteResponse{
-			Output:  "nil",
-			Context: []string{"another", "somehow", "something", "somewhat", "somewhere", "one_more_thing", "yet_another_thing"},
+		if f, err := os.Open("./public/response.json"); err == nil {
+			io.Copy(w, f)
+		} else {
+			http.Error(w, err.Error(), 500)
 		}
 	} else {
 		output = &OutputResponse{
 			Output: "fake output",
 		}
+		if buf, err := json.Marshal(output); err == nil {
+			fmt.Fprintln(w, string(buf))
+		} else {
+			http.Error(w, err.Error(), 500)
+		}
 	}
-	buf, err := json.Marshal(output)
-	if err != nil {
-		http.Error(w, http.StatusText(500), 500)
-		return
+}
+
+func github(c web.C, w http.ResponseWriter, r *http.Request) {
+	user := c.URLParams["user"]
+	repo := c.URLParams["repo"]
+	ref := c.URLParams["ref"]
+	path := c.URLParams["*"]
+
+	if res, err := http.Get(fmt.Sprintf(
+		"https://raw.githubusercontent.com/%s/%s/%s/%s",
+		user,
+		repo,
+		ref,
+		path,
+	)); err != nil {
+		http.Error(w, err.Error(), 500)
+		log.Fatal(err)
+	} else {
+		io.Copy(w, res.Body)
+		res.Body.Close()
 	}
-	fmt.Fprintln(w, string(buf))
 }
 
 func main() {
@@ -54,6 +77,7 @@ func main() {
 	http.Handle("/public/", public)
 
 	goji.Get("/", index)
-	goji.Put("/repl_sessions/fake", update_session)
+	goji.Put("/repl_sessions/fake", updateSession)
+	goji.Get("/github/:user/:repo/:ref/*", github)
 	goji.Serve()
 }

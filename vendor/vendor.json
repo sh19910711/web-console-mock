@@ -9,6 +9,16 @@
 	"ignore": "test",
 	"package": [
 		{
+			"path": "context",
+			"revision": ""
+		},
+		{
+			"checksumSHA1": "yXrS4e4yxaRBu/MX+39X3cS4kbg=",
+			"path": "github.com/Sirupsen/logrus",
+			"revision": "a283a10442df8dc09befd873fab202bf8a253d6a",
+			"revisionTime": "2016-07-16T02:56:31Z"
+		},
+		{
 			"checksumSHA1": "a3MwvEHFIkfvx/fRcE2eDni9Fdw=",
 			"path": "github.com/zenazn/goji",
 			"revision": "64eb34159fe53473206c2b3e70fe396a639452f2",
@@ -49,6 +59,18 @@
 			"path": "github.com/zenazn/goji/web/mutil",
 			"revision": "64eb34159fe53473206c2b3e70fe396a639452f2",
 			"revisionTime": "2016-05-07T20:19:45Z"
+		},
+		{
+			"checksumSHA1": "9jjO5GjLa0XF/nfWihF02RoH4qc=",
+			"path": "golang.org/x/net/context",
+			"revision": "7c62cfdcccc65f87b0120ec841012ba816fc1aec",
+			"revisionTime": "2016-08-04T20:59:57Z"
+		},
+		{
+			"checksumSHA1": "8fD/im5Kwvy3JgmxulDTambmE8w=",
+			"path": "golang.org/x/sys/unix",
+			"revision": "a646d33e2ee3172a661fc09bca23bb4889a41bc8",
+			"revisionTime": "2016-07-15T05:43:45Z"
 		}
 	],
 	"rootPath": "github.com/sh19910711/web-console-mock"
