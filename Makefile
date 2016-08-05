@@ -7,7 +7,7 @@ build:
 	go build -i
 
 run: build
-	go run main.go
+	go run ./*.go
 
 fmt:
 	go fmt ./...

@@ -2,12 +2,20 @@
 <html>
   <head>
     <title>Web Console Mock</title>
-    <script src="public/js/console.js?0729"></script>
+    {{ if eq .Ref "" }}
+      <script src="/public/js/console.js"></script>
+    {{ else }}
+      <script src="/github/{{.Ref}}/public/js/console.js"></script>
+    {{ end }}
   </head>
   <body>
     <h1>Web Console Mock</h1>
     <p>Try TAB key on console :-)</p>
-    <div id="console" data-session-id="fake"></div>
+    {{ if eq .Ref "" }}
+      <div id="console" data-session-id="fake"></div>
+    {{ else }}
+      <div id="console" data-session-id="fake/{{ .Ref }}"></div>
+    {{ end }}
     <script>
       REPLConsole.installInto('console');
     </script>
