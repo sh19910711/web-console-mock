@@ -45,13 +45,23 @@ function CommandStorage() {
 }
 
 function Autocomplete(words, prefix) {
-  this.words = words;
+  this.words = pretty(words);
   this.current = -1;
   this.left = 0; // [left, right)
-  this.right = words.length;
+  this.right = this.words.length;
   this.confirmed = false;
-  this.prefix = createSpan('...');
-  this.suffix = createSpan('...');
+
+  function pretty(words) {
+    var res = words.concat();
+    for (var i = 0; i < res.length; ++i) {
+      for (var j = 0; j < res[i].length; ++j) {
+        res[i][j] = [res[i][j], i];
+      }
+    }
+    var res = Array.prototype.concat.apply([], words);
+    res.sort();
+    return res;
+  }
 
   function createSpan(label) {
     var el = document.createElement('span');
@@ -60,29 +70,28 @@ function Autocomplete(words, prefix) {
   }
 
   this.view = document.createElement('pre');
+  this.view.appendChild(this.prefix = createSpan('...'));
+  this.view.appendChild(this.elements = document.createElement('span'));
+  this.view.appendChild(this.suffix = createSpan('...'));
   addClass(this.view, 'auto-complete console-message');
-
-  this.view.appendChild(this.prefix);
-  for (var key in this.words) {
-    this.view.appendChild(createSpan(this.words[key]));
-  }
-  this.view.appendChild(this.suffix);
-  addClass(this.view.children, 'trimmed keyword');
+  addClass(this.prefix, 'trimmed keyword');
+  addClass(this.suffix, 'trimmed keyword');
+  for (var x in this.words) this.words[x].push(createSpan(this.getWord(x)));
 
   this.refine(prefix || '');
 }
 
-Autocomplete.prototype.item = function(x) {
-  return this.view.children[x+1];
+Autocomplete.prototype.getWord = function(x) {
+  return this.words[x][0];
 };
 
-Autocomplete.prototype.currentWord = function() {
-  return this.left <= this.current && this.current < this.right && this.words[this.current];
-}
+Autocomplete.prototype.item = function(x) {
+  return this.elements.children[x];
+};
 
 Autocomplete.prototype.onFinished = function(callback) {
   this.onFinishedCallback = callback;
-  if (this.confirmed || this.canceled) callback(this.confirmed);
+  if (this.confirmed) callback(this.confirmed);
 };
 
 Autocomplete.prototype.onKeyDown = function(ev) {
@@ -90,7 +99,7 @@ Autocomplete.prototype.onKeyDown = function(ev) {
 
   function move(nextCurrent) {
     if (! self.words.length) return;
-    if (0 <= self.current && self.current < self.words.length) removeClass(self.item(self.current), 'selected');
+    if (0 <= self.current && self.current < self.elements.children.length) removeClass(self.item(self.current), 'selected');
     addClass(self.item(nextCurrent), 'selected');
     self.trim(self.current, true);
     self.trim(nextCurrent, false);
@@ -100,9 +109,9 @@ Autocomplete.prototype.onKeyDown = function(ev) {
   switch (ev.keyCode) {
     case 9: // Tab
       if (ev.shiftKey) { // move back
-        move(self.current - 1 < self.left ? self.right - 1 : self.current - 1);
+        move(self.current - 1 < 0 ? self.elements.children.length - 1 : self.current - 1);
       } else { // move next
-        move(self.current + 1 >= self.right ? self.left : self.current + 1);
+        move(self.current + 1 >= self.elements.children.length ? 0 : self.current + 1);
       }
       return true;
     case 13: // Enter
@@ -120,25 +129,25 @@ Autocomplete.prototype.trim = function(from, needToTrim) {
   var self = this;
   var num = 5;
 
-  if (this.right - this.left > num) {
-    (this.left < from ? removeClass : addClass)(this.prefix, 'trimmed');
-    (from + num < this.right? removeClass : addClass)(this.suffix, 'trimmed');
+  if (this.elements.children.length > num) {
+    (0 < from ? removeClass : addClass)(this.prefix, 'trimmed');
+    (from + num < this.elements.children.length ? removeClass : addClass)(this.suffix, 'trimmed');
   } else {
     addClass(this.prefix, 'trimmed');
     addClass(this.suffix, 'trimmed');
   }
 
   function iterate(x) {
-    for (var i = 0; i < num; ++i, ++x) if (self.left <= x && x < self.right) {
+    for (var i = 0; i < num; ++i, ++x) if (0 <= x && x < self.elements.children.length) {
       toggleClass(self.item(x), 'trimmed');
     }
   }
 
   var toggleClass = needToTrim ? addClass : removeClass;
-  if (from < this.left) {
-    iterate(this.left);
-  } else if (from + num - 1 >= this.right) {
-    iterate(this.right - num);
+  if (from < 0) {
+    iterate(0);
+  } else if (from + num - 1 >= this.elements.children.length) {
+    iterate(this.elements.children.length - num);
   } else {
     iterate(from);
   }
@@ -149,9 +158,12 @@ Autocomplete.prototype.refine = function(prefix) {
   this.prev = prefix;
   var self = this;
 
+  function remove(parent, child) {
+    if (parent == child.parentNode) parent.removeChild(child);
+  }
+
   function toggle(el) {
-    if (hasClass(el, 'selected')) removeClass(el, 'selected');
-    return inc ? addClass(el, 'hidden') : removeClass(el, 'hidden');
+    return inc ? remove(self.elements, el) : self.elements.appendChild(el);
   }
 
   function startsWith(str, prefix) {
@@ -159,22 +171,23 @@ Autocomplete.prototype.refine = function(prefix) {
   }
 
   function moveRight(l, r) {
-    while (l < r && inc !== startsWith(self.words[l], prefix)) {
-      toggle(self.item(l));
+    while (l < r && inc !== startsWith(self.getWord(l), prefix)) {
+      toggle(self.words[l][2]);
       ++ l;
     }
     return l;
   }
 
   function moveLeft(l, r) {
-    while (l < r - 1 && inc !== startsWith(self.words[r - 1], prefix)) {
-      toggle(self.item(r - 1));
+    while (l < r - 1 && inc !== startsWith(self.getWord(r - 1), prefix)) {
+      toggle(self.words[r - 1][2]);
       -- r;
     }
     return r;
   }
 
   self.trim(self.current, true);
+
   if (inc) {
     self.left = moveRight(self.left, self.right);
     self.right = moveLeft(self.left, self.right);
@@ -182,24 +195,38 @@ Autocomplete.prototype.refine = function(prefix) {
     self.left = moveLeft(-1, self.left);
     self.right = moveRight(self.right, self.words.length);
   }
-  if (this.current < this.left || this.current >= this.right) {
-    this.current = this.left - 1;
+  if (self.current < 0 || self.current >= self.right) {
+    self.current = 0;
   }
-  self.trim(this.current, false);
 
-  if (self.left + 1 == self.right) {
-    self.current = self.left;
-    self.finish();
-  } else if (self.left == self.right) {
-    self.cancel();
+  this.current = -1;
+  removeAllChildren(this.elements);
+  var items = this.words.slice(this.left, this.right);
+  for (var i = 0; i < items.length; ++i) {
+    items[i] = items[i].concat()
+    var t = items[i][0];
+    items[i][0] = items[i][1];
+    items[i][1] = t;
   }
+  items.sort();
+  for (var i = 0; i < items.length; ++i) {
+    this.elements.appendChild(items[i][2]);
+  }
+  addClass(this.elements.children, 'trimmed keyword');
+
+  if (self.left + 1 >= self.right) {
+    this.current = 0;
+    self.finish();
+  }
+
+  self.trim(this.current, false);
 };
 
 Autocomplete.prototype.finish = function() {
-  if (this.left <= this.current && this.current < this.right) {
-    this.confirmed = this.words[this.current];
-    if (this.onFinishedCallback) this.onFinishedCallback(this.confirmed);
+  if (0 <= this.current && this.current < this.elements.children.length) {
+    if (this.onFinishedCallback) this.onFinishedCallback(this.elements.children[this.current].innerText);
     this.removeView();
+    this.confirmed = this.elements.children[this.current].innerText;
   } else {
     this.cancel();
   }
@@ -207,7 +234,6 @@ Autocomplete.prototype.finish = function() {
 
 Autocomplete.prototype.cancel = function() {
   if (this.onFinishedCallback) this.onFinishedCallback();
-  this.canceled = true;
   this.removeView();
 };
 
@@ -222,7 +248,7 @@ var consoleInnerHtml = "<div class=\'resizer layer\'><\/div>\n<div class=\'conso
 var promptBoxHtml = "<span class=\'console-prompt-label\'><\/span>\n<pre class=\'console-prompt-display\'><\/pre>\n"
 ;
 // CSS
-var consoleStyleCss = ".console .pos-absolute { position: absolute; }\n.console .pos-fixed { position: fixed; }\n.console .pos-right { right: 0; }\n.console .border-box { box-sizing: border-box; }\n.console .layer { width: 100%; height: 100%; }\n.console .layer.console-outer { z-index: 1; }\n.console .layer.resizer { z-index: 2; }\n.console { position: fixed; left: 0; bottom: 0; width: 100%; height: 148px; padding: 0; margin: 0; background: none repeat scroll 0% 0% #333; z-index: 9999; }\n.console .console-outer { overflow: auto; padding-top: 4px; }\n.console .console-inner { font-family: monospace; font-size: 11px; width: 100%; height: 100%; overflow: none; background: #333; }\n.console .console-prompt-box { color: #FFF; }\n.console .console-message { color: #1AD027; margin: 0; border: 0; white-space: pre-wrap; background-color: #333; padding: 0; }\n.console .console-message.error-message { color: #fc9; }\n.console .console-message.auto-complete { word-break: break-all; }\n.console .console-message.auto-complete .keyword { margin-right: 11px; }\n.console .console-message.auto-complete .keyword.selected { background: #FFF; color: #000; }\n.console .console-message.auto-complete .hidden { display: none; }\n.console .console-message.auto-complete .trimmed { display: none; }\n.console .console-hint { text-decoration: underline; color: #099; }\n.console .console-focus .console-cursor { background: #FEFEFE; color: #333; font-weight: bold; }\n.console .resizer { background: #333; width: 100%; height: 4px; cursor: ns-resize; }\n.console .console-actions { padding-right: 3px; }\n.console .console-actions .button { float: left; }\n.console .button { cursor: pointer; border-radius: 1px; font-family: monospace; font-size: 13px; width: 14px; height: 14px; line-height: 14px; text-align: center; color: #ccc; }\n.console .button:hover { background: #666; color: #fff; }\n.console .button.close-button:hover { background: #966; }\n.console .clipboard { height: 0px; padding: 0px; margin: 0px; width: 0px; margin-left: -1000px; }\n.console .console-prompt-label { display: inline; color: #FFF; background: none repeat scroll 0% 0% #333; border: 0; padding: 0; }\n.console .console-prompt-display { display: inline; color: #FFF; background: none repeat scroll 0% 0% #333; border: 0; padding: 0; }\n.console.full-screen { height: 100%; }\n.console.full-screen .console-outer { padding-top: 3px; }\n.console.full-screen .resizer { display: none; }\n.console.full-screen .close-button { display: none; }\n"
+var consoleStyleCss = ".console .pos-absolute { position: absolute; }\n.console .pos-fixed { position: fixed; }\n.console .pos-right { right: 0; }\n.console .border-box { box-sizing: border-box; }\n.console .layer { width: 100%; height: 100%; }\n.console .layer.console-outer { z-index: 1; }\n.console .layer.resizer { z-index: 2; }\n.console { position: fixed; left: 0; bottom: 0; width: 100%; height: 148px; padding: 0; margin: 0; background: none repeat scroll 0% 0% #333; z-index: 9999; }\n.console .console-outer { overflow: auto; padding-top: 4px; }\n.console .console-inner { font-family: monospace; font-size: 11px; width: 100%; height: 100%; overflow: none; background: #333; }\n.console .console-prompt-box { color: #FFF; }\n.console .console-message { color: #1AD027; margin: 0; border: 0; white-space: pre-wrap; background-color: #333; padding: 0; }\n.console .console-message.error-message { color: #fc9; }\n.console .console-message.auto-complete { word-break: break-all; }\n.console .console-message.auto-complete .keyword { margin-right: 11px; }\n.console .console-message.auto-complete .keyword.selected { background: #FFF; color: #000; }\n.console .console-message.auto-complete .hidden { display: none; }\n.console .console-message.auto-complete .trimmed { display: none; }\n.console .console-focus .console-cursor { background: #FEFEFE; color: #333; font-weight: bold; }\n.console .resizer { background: #333; width: 100%; height: 4px; cursor: ns-resize; }\n.console .console-actions { padding-right: 3px; }\n.console .console-actions .button { float: left; }\n.console .button { cursor: pointer; border-radius: 1px; font-family: monospace; font-size: 13px; width: 14px; height: 14px; line-height: 14px; text-align: center; color: #ccc; }\n.console .button:hover { background: #666; color: #fff; }\n.console .button.close-button:hover { background: #966; }\n.console .clipboard { height: 0px; padding: 0px; margin: 0px; width: 0px; margin-left: -1000px; }\n.console .console-prompt-label { display: inline; color: #FFF; background: none repeat scroll 0% 0% #333; border: 0; padding: 0; }\n.console .console-prompt-display { display: inline; color: #FFF; background: none repeat scroll 0% 0% #333; border: 0; padding: 0; }\n.console.full-screen { height: 100%; }\n.console.full-screen .console-outer { padding-top: 3px; }\n.console.full-screen .resizer { display: none; }\n.console.full-screen .close-button { display: none; }\n"
 ;
 // Insert a style element with the unique ID
 var styleElementId = 'sr02459pvbvrmhco';
@@ -460,7 +486,6 @@ REPLConsole.prototype.setInput = function(input, caretPos) {
   if (input == null) return; // keep value if input is undefined
   this._caretPos = caretPos === undefined ? input.length : caretPos;
   this._input = input;
-  if (this.autocomplete && !this.autocomplete.confirmed) this.autocomplete.refine(input);
   this.renderInput();
 };
 
@@ -483,8 +508,9 @@ REPLConsole.prototype.renderInput = function() {
   // Clear the current input.
   removeAllChildren(this.promptDisplay);
 
+  var promptCursor = document.createElement('span');
+  promptCursor.className = "console-cursor";
   var before, current, after;
-  var center = document.createElement('span');
 
   if (this._caretPos < 0) {
     before = this._input;
@@ -500,12 +526,9 @@ REPLConsole.prototype.renderInput = function() {
   }
 
   this.promptDisplay.appendChild(document.createTextNode(before));
-  this.promptDisplay.appendChild(center);
+  promptCursor.appendChild(document.createTextNode(current));
+  this.promptDisplay.appendChild(promptCursor);
   this.promptDisplay.appendChild(document.createTextNode(after));
-
-  var hint = this.autocomplete && !this.autocomplete.confirmed && this.autocomplete.currentWord();
-  addClass(center, hint ? 'console-hint' : 'console-cursor');
-  center.appendChild(document.createTextNode(hint ? hint.substr(this._input.length) : current));
 };
 
 REPLConsole.prototype.writeOutput = function(output) {
@@ -546,7 +569,7 @@ REPLConsole.prototype.onTabKey = function() {
     self.autocomplete = new Autocomplete(obj['context'], self.getCurrentWord());
     self.inner.appendChild(self.autocomplete.view);
     self.autocomplete.onFinished(function(word) {
-      if (word) self.swapCurrentWord(word);
+      self.swapCurrentWord(word);
       self.autocomplete = false;
     });
     self.scrollToBottom();
@@ -563,7 +586,6 @@ REPLConsole.prototype.onNavigateHistory = function(offset) {
  */
 REPLConsole.prototype.onKeyDown = function(ev) {
   if (this.autocomplete && this.autocomplete.onKeyDown(ev)) {
-    this.renderInput();
     ev.preventDefault();
     ev.stopPropagation();
     return;
@@ -612,6 +634,7 @@ REPLConsole.prototype.onKeyDown = function(ev) {
     case 8:
       // Delete
       this.deleteAtCurrent();
+      if (this.autocomplete) this.autocomplete.refine(this.getCurrentWord());
       ev.preventDefault();
       break;
     default:
@@ -644,6 +667,7 @@ REPLConsole.prototype.onKeyPress = function(ev) {
   if (ev.ctrlKey || ev.metaKey) { return; }
   var keyCode = ev.keyCode || ev.which;
   this.insertAtCurrent(String.fromCharCode(keyCode));
+  if (this.autocomplete) this.autocomplete.refine(this.getCurrentWord());
   ev.stopPropagation();
   ev.preventDefault();
 };
